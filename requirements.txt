@@ -10,3 +10,5 @@ python-multipart>=0.0.5
 aiohttp>=3.8.0
 loguru>=0.5.3
 tenacity>=8.0.1
+Pillow>=9.0.0
+pytesseract>=0.3.8
