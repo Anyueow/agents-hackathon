@@ -1,5 +1,5 @@
 from typing import Dict, Any, Optional
-from .interfaces import (
+from agents.interfaces import (
     IPolicyFetcher,
     IMessageGenerator,
     IResponseAnalyzer,
