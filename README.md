@@ -1,14 +1,40 @@
 # Refund Automation Agent 🤖
 
-An intelligent agent that automates the process of obtaining refunds or replacements for unsatisfactory purchases from various e-commerce and service platforms (Amazon, Uber Eats, Airbnb, etc.).
+An AI-powered agent that automates the process of obtaining refunds or replacements from e-commerce and service platforms. Built with OpenAI's GPT-4, this agent handles the entire refund workflow from initial request to resolution.
 
-## 🌟 Features
+## 🎯 Core Features
 
-- **Automated Refund Processing**: Handles the entire refund workflow from initial request to resolution
-- **Policy Analysis**: Automatically fetches and analyzes company refund policies
-- **Smart Communication**: Drafts contextually appropriate refund request messages
-- **Escalation Management**: Intelligently handles rejection scenarios with appropriate escalation
-- **Performance Tracking**: Logs success rates and identifies patterns in responses
+- **Smart Request Generation**: Crafts professional, policy-aware refund requests
+- **Policy Analysis**: Automatically fetches and analyzes platform refund policies
+- **Escalation Management**: Intelligently handles rejections with appropriate escalation strategies
+- **Receipt Processing**: Extracts and validates order information from receipts
+- **Performance Tracking**: Logs and analyzes success rates and response patterns
+
+## 🏗️ Architecture
+
+Built following SOLID principles, the system is modular and easily extensible:
+
+```
+agents-hackathon/
+├── agents/
+│   ├── interfaces.py         # Core interfaces (SOLID design)
+│   ├── refund_agent.py      # Main agent orchestrator
+│   └── implementations/     
+│       ├── openai_message_gen.py
+│       ├── policy_fetcher.py
+│       └── response_analyzer.py
+├── utils/
+│   └── logging.py
+└── main.py                  # FastAPI application
+```
+
+### Key Components
+
+- **RefundAgent**: Orchestrates the refund process
+- **PolicyFetcher**: Retrieves platform-specific refund policies
+- **MessageGenerator**: Creates refund requests and escalations using GPT-4
+- **ResponseAnalyzer**: Analyzes platform responses
+- **EvidenceProcessor**: Handles receipt validation
 
 ## 🚀 Getting Started
 
@@ -16,7 +42,7 @@ An intelligent agent that automates the process of obtaining refunds or replacem
 
 - Python 3.8+
 - OpenAI API key
-- Required Python packages (install via `requirements.txt`)
+- FastAPI and dependencies
 
 ### Installation
 
@@ -26,111 +52,117 @@ git clone https://github.com/Anyueow/agents-hackathon.git
 cd agents-hackathon
 ```
 
-2. Install dependencies:
+2. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\\Scripts\\activate
+```
+
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Set up your OpenAI API key:
+4. Set up your OpenAI API key:
    - Create a `secrets.py` file in the root directory
    - Add your API key:
    ```python
    OPENAI_API_KEY = "your-api-key-here"
    ```
 
-### Usage
+### Running the Service
 
-1. Run the agent:
+1. Start the FastAPI server:
 ```bash
 python main.py
 ```
 
-2. Follow the prompts to:
-   - Upload receipt or describe the issue
-   - Provide relevant order details
-   - Review and approve the generated refund request
+2. Access the API documentation:
+   - Open http://localhost:8000/docs in your browser
+   - Interactive API documentation will be available
 
-## 🔧 Project Structure
+## 📡 API Endpoints
 
-```
-agents-hackathon/
-├── main.py                 # Main application entry point
-├── agents/
-│   ├── __init__.py
-│   ├── refund_agent.py    # Core agent logic
-│   ├── policy_fetcher.py  # Policy retrieval functionality
-│   └── message_gen.py     # Message generation module
-├── utils/
-│   ├── __init__.py
-│   ├── email_handler.py   # Email processing utilities
-│   └── logging.py         # Logging functionality
-├── data/
-│   └── response_logs/     # Success/failure tracking
-├── tests/                 # Unit and integration tests
-├── requirements.txt       # Project dependencies
-└── secrets.py            # API keys and credentials
+### POST /process-refund
+Initiates a new refund request
+
+```python
+{
+    "platform": "amazon",
+    "order_id": "123-456-789",
+    "issue_description": "Item arrived damaged",
+    "email": "optional@email.com"
+}
 ```
 
-## 🔄 How It Works
+### POST /handle-response/{order_id}
+Processes platform response and determines next steps
 
-1. **Input Processing**
-   - User uploads receipt or emails issue description
-   - Agent extracts relevant order details
+```python
+{
+    "platform": "amazon",
+    "response": "Response from the platform"
+}
+```
 
-2. **Policy Analysis**
-   - Agent fetches company's refund policies
-   - Analyzes terms and conditions
-   - Identifies applicable refund scenarios
+## 💡 Usage Example
 
-3. **Request Generation**
-   - Drafts professional refund request
-   - Incorporates relevant policy points
-   - Optimizes message for approval likelihood
-
-4. **Response Handling**
-   - Monitors for company response
-   - If approved: Processes success
-   - If rejected: Initiates escalation sequence
-
-5. **Performance Tracking**
-   - Logs success/failure rates
-   - Analyzes response patterns
-   - Generates insights for improvement
-
-## 📊 Success Metrics
-
-The agent tracks:
-- Success rate by company
-- Average resolution time
-- Escalation effectiveness
-- Common rejection reasons
-- Response patterns
+```python
+# Example using curl
+curl -X POST "http://localhost:8000/process-refund" \
+     -H "Content-Type: multipart/form-data" \
+     -F "platform=amazon" \
+     -F "order_id=123-456-789" \
+     -F "issue_description=Item arrived damaged" \
+     -F "receipt=@receipt.pdf"
+```
 
 ## 🛠️ Development
 
 ### Adding New Platforms
 
-To add support for a new e-commerce platform:
+1. Create a new platform handler in `agents/implementations/`:
+```python
+from agents.interfaces import IPolicyFetcher
 
-1. Create a new platform handler in `agents/platforms/`
-2. Implement the required interfaces:
-   - Policy fetching
-   - Message generation
-   - Response processing
+class AmazonPolicyFetcher(IPolicyFetcher):
+    async def fetch_policy(self, platform: str) -> RefundPolicy:
+        # Implementation
+        pass
+```
+
+2. Register the implementation in `main.py`
 
 ### Running Tests
 
 ```bash
-python -m pytest tests/
+pytest tests/
 ```
+
+## 📊 Monitoring
+
+The agent logs detailed information about:
+- Request success rates
+- Response patterns
+- Escalation effectiveness
+- Processing times
+
+Logs are stored in `data/response_logs/app.log`
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+### Development Guidelines
+
+- Follow SOLID principles
+- Keep files under 200 lines
+- Add tests for new features
+- Update documentation
 
 ## 📝 License
 
@@ -138,5 +170,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- OpenAI for their powerful API
-- The open-source community for various tools and libraries used in this project 
+- OpenAI for GPT-4 API
+- FastAPI framework
+- The open-source community 

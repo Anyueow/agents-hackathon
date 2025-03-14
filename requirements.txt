@@ -1,7 +1,12 @@
-openai==1.66.3
-openai-agents==0.0.4
-pydantic==2.10.6
-requests==2.32.3
-python-dotenv==1.0.0  # For environment variable management
-typing-extensions==4.12.2
-httpx==0.28.1  # Required by OpenAI
+openai>=1.0.0
+python-dotenv>=0.19.0
+requests>=2.26.0
+beautifulsoup4>=4.9.3
+pytest>=6.2.5
+pydantic>=2.0.0
+fastapi>=0.68.0
+uvicorn>=0.15.0
+python-multipart>=0.0.5
+aiohttp>=3.8.0
+loguru>=0.5.3
+tenacity>=8.0.1
