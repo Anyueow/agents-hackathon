@@ -39,4 +39,4 @@ ENV/
 ehthumbs.db
 Thumbs.db 
 
-secrets.toml
+secrets.py
