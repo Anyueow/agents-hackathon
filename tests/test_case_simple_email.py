@@ -7,8 +7,11 @@ from agents.implementations.policy_fetcher import OpenAIPolicyFetcher
 from agents.implementations.openai_message_gen import OpenAIMessageGenerator
 from agents.implementations.response_analyzer import OpenAIResponseAnalyzer
 from agents.implementations.evidence_processor import OpenAIEvidenceProcessor
-import secrets
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class SimpleRefundContext(BaseModel):
     """Context for simple email-based refund workflow"""
@@ -25,6 +28,11 @@ class SimpleRefundContext(BaseModel):
 async def test_simple_email_refund(context: SimpleRefundContext):
     """Test refund workflow for a simple email-based return system"""
     
+    # Get API key from environment
+    api_key = os.getenv('OPENAI_API_KEY')
+    if not api_key:
+        raise ValueError("OpenAI API Key not found in environment variables")
+    
     # Generate a conversation ID
     conversation_id = uuid.uuid4().hex[:16]
     
@@ -32,10 +40,10 @@ async def test_simple_email_refund(context: SimpleRefundContext):
         print("\n=== Starting Simple Email Refund Test Case ===")
         
         # Initialize components
-        policy_fetcher = OpenAIPolicyFetcher(api_key=secrets.OPENAI_API_KEY)
-        message_generator = OpenAIMessageGenerator(api_key=secrets.OPENAI_API_KEY)
-        response_analyzer = OpenAIResponseAnalyzer(api_key=secrets.OPENAI_API_KEY)
-        evidence_processor = OpenAIEvidenceProcessor(api_key=secrets.OPENAI_API_KEY)
+        policy_fetcher = OpenAIPolicyFetcher(api_key=api_key)
+        message_generator = OpenAIMessageGenerator(api_key=api_key)
+        response_analyzer = OpenAIResponseAnalyzer(api_key=api_key)
+        evidence_processor = OpenAIEvidenceProcessor(api_key=api_key)
 
         # Initialize the agent
         agent = RefundAgent(

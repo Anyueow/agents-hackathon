@@ -2,10 +2,13 @@ import streamlit as st
 import asyncio
 from tests.test_case_simple_email import SimpleRefundContext, test_simple_email_refund
 from agents.implementations.evidence_processor import OpenAIEvidenceProcessor
-import secrets
 import os
 from PIL import Image
 import io
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 st.set_page_config(
     page_title="Refund Automation Demo",
@@ -34,15 +37,48 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-async def process_image(image_bytes):
+def get_api_key():
+    """Get OpenAI API key from environment or user input"""
+    api_key = os.getenv('OPENAI_API_KEY')
+    
+    if not api_key:
+        # Check if API key is in session state
+        if 'openai_api_key' not in st.session_state:
+            st.session_state.openai_api_key = None
+            
+        if not st.session_state.openai_api_key:
+            st.warning("⚠️ OpenAI API Key not found in environment variables")
+            api_key = st.text_input(
+                "Enter your OpenAI API Key",
+                type="password",
+                help="Get your API key from https://platform.openai.com/account/api-keys"
+            )
+            if api_key:
+                st.session_state.openai_api_key = api_key
+        else:
+            api_key = st.session_state.openai_api_key
+            
+    return api_key
+
+async def process_image(image_bytes, api_key):
     """Process the uploaded image using OpenAI Evidence Processor"""
-    processor = OpenAIEvidenceProcessor(api_key=secrets.OPENAI_API_KEY)
+    if not api_key:
+        raise ValueError("OpenAI API Key is required")
+    
+    processor = OpenAIEvidenceProcessor(api_key=api_key)
     result = await processor.process_receipt(image_bytes)
     return result
 
 def main():
     st.title("🔄 Refund Automation Demo")
     st.markdown("### Upload your order details and process refund")
+
+    # Get API key
+    api_key = get_api_key()
+    
+    if not api_key:
+        st.error("Please provide an OpenAI API key to continue")
+        st.stop()
 
     # Initialize session state
     if 'refund_status' not in st.session_state:
@@ -61,14 +97,18 @@ def main():
         # Process the image if not already processed
         if not st.session_state.order_details:
             with st.spinner("Processing order details from image..."):
-                # Convert image to bytes
-                img_byte_arr = io.BytesIO()
-                image.save(img_byte_arr, format=image.format)
-                img_byte_arr = img_byte_arr.getvalue()
-                
-                # Process the image
-                result = asyncio.run(process_image(img_byte_arr))
-                st.session_state.order_details = result
+                try:
+                    # Convert image to bytes
+                    img_byte_arr = io.BytesIO()
+                    image.save(img_byte_arr, format=image.format)
+                    img_byte_arr = img_byte_arr.getvalue()
+                    
+                    # Process the image
+                    result = asyncio.run(process_image(img_byte_arr, api_key))
+                    st.session_state.order_details = result
+                except Exception as e:
+                    st.error(f"Error processing image: {str(e)}")
+                    st.stop()
 
     # Create two columns for the layout
     col1, col2 = st.columns([1, 1])
