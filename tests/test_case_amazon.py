@@ -2,7 +2,8 @@ import asyncio
 import os
 from PIL import Image
 import io
-import agentops
+import uuid
+from pydantic import BaseModel
 from agents.refund_agent import RefundAgent
 from agents.implementations.policy_fetcher import OpenAIPolicyFetcher
 from agents.implementations.openai_message_gen import OpenAIMessageGenerator
@@ -10,12 +11,28 @@ from agents.implementations.response_analyzer import OpenAIResponseAnalyzer
 from agents.implementations.evidence_processor import OpenAIEvidenceProcessor
 import secrets
 
+class RefundContext(BaseModel):
+    """Context for the refund workflow"""
+    order_id: str | None = None
+    order_date: str | None = None
+    product_name: str | None = None
+    total_amount: float | None = None
+    merchant: str | None = None
+    payment_method: str | None = None
+    delivery_status: str | None = None
+    refund_status: str = "pending"
+    evidence_processed: bool = False
+
 async def test_amazon_refund():
     """Test refund workflow with actual Amazon order details"""
     
+    # Initialize context and AgentOps
+    context = RefundContext()
+    
+    # Generate a conversation ID
+    conversation_id = uuid.uuid4().hex[:16]
+    
     try:
-        # Initialize AgentOps monitoring
-        agentops.init(secrets.AGENTOPS_API_KEY)
         print("\n=== Starting Amazon Refund Test Case ===")
         
         # Initialize components
@@ -41,32 +58,37 @@ async def test_amazon_refund():
         # Extract order details from the image using evidence processor
         order_details = await evidence_processor.process_receipt(order_image)
         
+        
+            
+        # Update context with extracted information
+        context.order_id = order_details.get('order_id')
+        context.order_date = order_details.get('date')
+        context.product_name = order_details.get('items', [{}])[0].get('name') if order_details.get('items') else None
+        context.total_amount = order_details.get('total_amount')
+        context.merchant = order_details.get('merchant')
+        context.payment_method = order_details.get('payment_method')
+        context.delivery_status = order_details.get('delivery_status')
+        context.evidence_processed = True
+        
         print("\nExtracted Order Details:")
         print("-" * 20)
-        print(f"Order ID: {order_details.get('order_id', 'Not found')}")
-        print(f"Date: {order_details.get('date', 'Not found')}")
-        print(f"Items: {order_details.get('items', 'Not found')}")
-        print(f"Total Amount: ${order_details.get('total_amount', 'Not found')}")
-        print(f"Merchant: {order_details.get('merchant', 'Not found')}")
-        print(f"Payment Method: {order_details.get('payment_method', 'Not found')}")
-        print(f"Delivery Status: {order_details.get('delivery_status', 'Not found')}")
+        print(f"Order ID: {context.order_id}")
+        print(f"Date: {context.order_date}")
+        print(f"Product: {context.product_name}")
+        print(f"Total Amount: ${context.total_amount}")
+        print(f"Merchant: {context.merchant}")
+        print(f"Payment Method: {context.payment_method}")
+        print(f"Delivery Status: {context.delivery_status}")
         print("-" * 20)
 
-        # Log successful evidence processing
-        agentops.log_event("evidence_processing", {
-            "status": "success",
-            "extracted_fields": list(order_details.keys()),
-            "order_id": order_details.get('order_id')
-        })
-
-        # Prepare issue description using extracted details
+        # Prepare issue description using context
         issue_description = f"""
         Order Details:
-        - Order ID: {order_details.get('order_id')}
-        - Date: {order_details.get('date')}
-        - Items: {', '.join(str(item) for item in order_details.get('items', []))}
-        - Total Amount: ${order_details.get('total_amount')}
-        - Merchant: {order_details.get('merchant')}
+        - Order ID: {context.order_id}
+        - Date: {context.order_date}
+        - Product: {context.product_name}
+        - Total Amount: ${context.total_amount}
+        - Merchant: {context.merchant}
 
         Issue Description:
         The product arrived damaged. Upon opening the package, I noticed that the 
@@ -74,25 +96,22 @@ async def test_amazon_refund():
         product unusable and I would like a refund or replacement.
 
         Payment Information:
-        - Payment Method: {order_details.get('payment_method')}
-        - Delivery Status: {order_details.get('delivery_status')}
+        - Payment Method: {context.payment_method}
+        - Delivery Status: {context.delivery_status}
         """
 
         print("\n2. Initiating refund request...")
         result = await agent.initiate_refund(
             platform="amazon",
-            order_id=order_details.get('order_id'),
+            order_id=context.order_id,
             issue_description=issue_description,
             receipt_data=order_image
         )
+        
+       
+        
         print_formatted_result("Initial Request Result:", result)
-
-        # Log refund initiation result
-        agentops.log_event("refund_initiation", {
-            "status": result.get("status"),
-            "message": result.get("message"),
-            "order_id": order_details.get('order_id')
-        })
+        context.refund_status = result.get("status", "pending")
 
         # Test response handling with dynamic order details
         responses = [
@@ -102,7 +121,7 @@ async def test_amazon_refund():
                 Thank you for contacting Amazon Customer Service.
                 I understand you're requesting a refund for the damaged product.
                 Could you please provide clear photos of the damage to help us process your claim?
-                This will help us better assist you with your refund request for order {order_details.get('order_id')}.
+                This will help us better assist you with your refund request for order {context.order_id}.
                 """
             },
             {
@@ -110,7 +129,7 @@ async def test_amazon_refund():
                 "response": f"""
                 Thank you for your patience. I've reviewed your case and the product details.
                 Given that the product arrived damaged, I've approved a full refund of 
-                ${order_details.get('total_amount')} to your {order_details.get('payment_method')}. 
+                ${context.total_amount} to your {context.payment_method}. 
                 You should see this refund in 3-5 business days. You don't need to return the damaged item.
                 We apologize for any inconvenience caused.
                 """
@@ -121,32 +140,24 @@ async def test_amazon_refund():
         for scenario in responses:
             print(f"\n{scenario['scenario']}...")
             result = await agent.handle_response(
-                order_id=order_details.get('order_id'),
+                order_id=context.order_id,
                 response=scenario['response'],
                 platform="amazon"
             )
-            print_formatted_result(f"{scenario['scenario']} Result:", result)
             
-            # Log response handling result
-            agentops.log_event("response_handling", {
-                "scenario": scenario['scenario'],
-                "status": result.get("status"),
-                "message": result.get("message"),
-                "order_id": order_details.get('order_id')
-            })
+            
+            
+            print_formatted_result(f"{scenario['scenario']} Result:", result)
+            context.refund_status = result.get("status", context.refund_status)
 
-        # End session with success
-        agentops.end_session("Success")
+       
 
     except Exception as e:
-        # Log any errors and end session with failure
+        # Log error and end workflow with failure
         error_message = str(e)
         print(f"\nError occurred: {error_message}")
-        agentops.log_event("error", {
-            "error_type": type(e).__name__,
-            "error_message": error_message
-        })
-        agentops.end_session("Failure")
+        
+       
         raise
 
 def print_formatted_result(title, result):
